@@ -1,10 +1,9 @@
 /.idea
 /.vscode
 /.gradle
+/.gradle-user
 /node_modules
-/**/target
-/**/build
-/.expo
-.env
-.env.*
 *.log
+*.bin
+*.class
+*.kt
