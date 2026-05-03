@@ -1,0 +1,70 @@
+server:
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: authorization-service
+  profiles:
+    default: local
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/tranning?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    # Auth DB already has real data in local environments. Baseline at V1 so Flyway
+    # does not try to re-run V1 and risk "table already exists" failures.
+    baseline-version: 1
+    baseline-description: existing-schema
+    table: flyway_schema_history_auth
+  jackson:
+    time-zone: UTC
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{correlationId}] %logger{36} - %msg%n"
+
+app:
+  jwt:
+    issuer: ${JWT_ISSUER:ledger-auth}
+    # For production set a long random secret via env var. Must be >= 32 bytes.
+    secret: ${JWT_SECRET:dev-secret-dev-secret-dev-secret-dev-secret}
+    access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:15}
+  user-service:
+    base-url: ${USER_SERVICE_BASE_URL:http://localhost:8084}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

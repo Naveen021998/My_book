@@ -1,0 +1,10 @@
+/.idea
+/.vscode
+/.gradle
+/node_modules
+/**/target
+/**/build
+/.expo
+.env
+.env.*
+*.log

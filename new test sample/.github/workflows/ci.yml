@@ -1,0 +1,24 @@
+﻿name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Build services (skip tests)
+        run: |
+          mvn -f authorization-service/pom.xml -DskipTests package
+          mvn -f api-gateway-service/pom.xml -DskipTests package
+          mvn -f core-application-service/pom.xml -DskipTests package
+          mvn -f user-service/pom.xml -DskipTests package
+          mvn -f notification-service/pom.xml -DskipTests package
+          mvn -f file-service/pom.xml -DskipTests package

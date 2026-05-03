@@ -1,0 +1,134 @@
+worker_processes  1;
+
+events {
+  worker_connections  1024;
+}
+
+http {
+  include       mime.types;
+  default_type  application/octet-stream;
+  sendfile      on;
+
+  client_max_body_size 1m;
+
+  # Basic protection for public auth endpoints (best-effort). Services still enforce their own rules.
+  limit_req_zone $binary_remote_addr zone=auth_limit:10m rate=10r/s;
+
+  # Service layer single URL reverse-proxy.
+  # AUTH_UPSTREAM, USER_UPSTREAM, and CORE_UPSTREAM are substituted by the container entrypoint.
+  upstream auth_upstream {
+    server ${AUTH_UPSTREAM};
+  }
+  upstream core_upstream {
+    server ${CORE_UPSTREAM};
+  }
+  upstream user_upstream {
+    server ${USER_UPSTREAM};
+  }
+  upstream notification_upstream {
+    server ${NOTIFICATION_UPSTREAM};
+  }
+  upstream file_upstream {
+    server ${FILE_UPSTREAM};
+  }
+
+  server {
+    listen 8080;
+
+    # Health endpoint for the gateway itself
+    location = /health {
+      return 200 "OK\n";
+      add_header Content-Type text/plain;
+    }
+
+    # Auth routes
+    location ^~ /api/v1/auth {
+      limit_req zone=auth_limit burst=20 nodelay;
+      proxy_pass http://auth_upstream;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Correlation-Id $http_x_correlation_id;
+      proxy_connect_timeout 3s;
+      proxy_read_timeout 30s;
+    }
+
+    # User routes
+    location ^~ /api/v1/users {
+      proxy_pass http://user_upstream;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Correlation-Id $http_x_correlation_id;
+      proxy_connect_timeout 3s;
+      proxy_read_timeout 30s;
+    }
+
+    # Notification routes
+    location ^~ /api/v1/notifications {
+      proxy_pass http://notification_upstream;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Correlation-Id $http_x_correlation_id;
+      proxy_connect_timeout 3s;
+      proxy_read_timeout 30s;
+    }
+
+    # File routes
+    location ^~ /api/v1/files {
+      proxy_pass http://file_upstream;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Correlation-Id $http_x_correlation_id;
+      proxy_connect_timeout 3s;
+      proxy_read_timeout 30s;
+    }
+
+    # Swagger/OpenAPI via gateway (keeps "single entrypoint" even for docs).
+    # Example: http://localhost:8080/swagger/auth/swagger-ui.html
+    location ^~ /swagger/auth/ {
+      rewrite ^/swagger/auth/(.*)$ /$1 break;
+      proxy_pass http://auth_upstream;
+    }
+    location ^~ /swagger/users/ {
+      rewrite ^/swagger/users/(.*)$ /$1 break;
+      proxy_pass http://user_upstream;
+    }
+    location ^~ /swagger/core/ {
+      rewrite ^/swagger/core/(.*)$ /$1 break;
+      proxy_pass http://core_upstream;
+    }
+    location ^~ /swagger/notifications/ {
+      rewrite ^/swagger/notifications/(.*)$ /$1 break;
+      proxy_pass http://notification_upstream;
+    }
+    location ^~ /swagger/files/ {
+      rewrite ^/swagger/files/(.*)$ /$1 break;
+      proxy_pass http://file_upstream;
+    }
+
+    # Core routes
+    location /api/v1/ {
+      proxy_pass http://core_upstream;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Correlation-Id $http_x_correlation_id;
+      proxy_connect_timeout 3s;
+      proxy_read_timeout 30s;
+    }
+
+    # Everything else
+    location / {
+      return 404 "Not Found\n";
+      add_header Content-Type text/plain;
+    }
+  }
+}
