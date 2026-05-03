@@ -1,0 +1,9 @@
+spring:
+  main:
+    banner-mode: off
+  datasource:
+    url: ${DB_URL:jdbc:mysql://mysql:3306/tranning?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+\napp:\n  user-service:\n    base-url: 
