@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.reminder.controller;
+package com.example.coreapp.reminder.controller;
 
 import com.example.coreapp.common.web.PagedResponse;
 import com.example.coreapp.reminder.dto.PrepareReminderRequest;

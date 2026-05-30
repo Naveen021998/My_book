@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.reporting.controller;
+package com.example.coreapp.reporting.controller;
 
 import com.example.coreapp.reporting.dto.AgingReportResponse;
 import com.example.coreapp.reporting.dto.SummaryReportResponse;

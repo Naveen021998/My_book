@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.ledger.repository;
+package com.example.coreapp.ledger.repository;
 
 import com.example.coreapp.ledger.entity.LedgerEntryEntity;
 import java.util.Optional;

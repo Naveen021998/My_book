@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.reminder.repository;
+package com.example.coreapp.reminder.repository;
 
 import com.example.coreapp.reminder.entity.ReminderEntity;
 import java.util.Optional;

@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.reporting.dto;
+package com.example.coreapp.reporting.dto;
 
 public record AgingReportResponse(
         long receivable0To7,

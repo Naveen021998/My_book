@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.audit.controller;
+package com.example.coreapp.audit.controller;
 
 import com.example.coreapp.audit.dto.AuditLogResponse;
 import com.example.coreapp.audit.service.AuditLogService;

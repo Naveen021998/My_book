@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.audit.dto;
+package com.example.coreapp.audit.dto;
 
 import java.time.OffsetDateTime;
 

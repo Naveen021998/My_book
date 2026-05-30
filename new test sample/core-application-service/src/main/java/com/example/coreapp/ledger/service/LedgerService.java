@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.ledger.service;
+package com.example.coreapp.ledger.service;
 
 import com.example.coreapp.audit.service.AuditLogService;
 import com.example.coreapp.common.exception.ResourceNotFoundException;

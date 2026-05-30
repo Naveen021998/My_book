@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.audit.entity;
+package com.example.coreapp.audit.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

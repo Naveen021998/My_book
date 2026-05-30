@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.reminder.entity;
+package com.example.coreapp.reminder.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

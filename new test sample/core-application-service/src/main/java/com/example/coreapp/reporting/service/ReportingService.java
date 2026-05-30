@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.reporting.service;
+package com.example.coreapp.reporting.service;
 
 import com.example.coreapp.party.repository.PartyBalanceRepository;
 import com.example.coreapp.reporting.dto.AgingReportResponse;

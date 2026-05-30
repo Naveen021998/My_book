@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.reminder.service;
+package com.example.coreapp.reminder.service;
 
 import com.example.coreapp.audit.service.AuditLogService;
 import com.example.coreapp.common.exception.ResourceNotFoundException;

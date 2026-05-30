@@ -6,4 +6,7 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
-\napp:\n  user-service:\n    base-url: 
+
+app:
+  user-service:
+    base-url: ${USER_SERVICE_BASE_URL:http://user-service:8084}

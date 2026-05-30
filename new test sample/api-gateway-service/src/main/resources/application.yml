@@ -10,10 +10,12 @@ upstreams:
   file: ${FILE_UPSTREAM:http://localhost:8086}
 
 spring:
-  application:
-    name: api-gateway-service
-  main:
-    web-application-type: reactive
+   application:
+     name: api-gateway-service
+   profiles:
+     default: test
+   main:
+     web-application-type: reactive
 
 app:
   internal:

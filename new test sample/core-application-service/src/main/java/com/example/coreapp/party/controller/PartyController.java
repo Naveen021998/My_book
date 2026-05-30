@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.party.controller;
+package com.example.coreapp.party.controller;
 
 import com.example.coreapp.common.web.PagedResponse;
 import com.example.coreapp.party.dto.CreatePartyRequest;

@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.party.controller;
+package com.example.coreapp.party.controller;
 
 import com.example.coreapp.common.exception.ResourceNotFoundException;
 import com.example.coreapp.ledger.entity.LedgerEntryEntity;

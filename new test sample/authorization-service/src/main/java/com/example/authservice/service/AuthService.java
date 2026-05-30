@@ -11,15 +11,21 @@ import com.example.authservice.dto.RegisterResponse;
 import com.example.authservice.dto.VerifyOtpRequest;
 import com.example.authservice.entity.AuthSessionEntity;
 import com.example.authservice.entity.AuthUserEntity;
+import com.example.authservice.entity.RoleEntity;
+import com.example.authservice.entity.UserRoleEntity;
+import com.example.authservice.entity.UserRoleId;
 import com.example.authservice.exception.AuthenticationFailedException;
 import com.example.authservice.exception.ResourceConflictException;
 import com.example.authservice.exception.TokenValidationException;
 import com.example.authservice.mapper.AuthMapper;
 import com.example.authservice.repository.AuthSessionRepository;
 import com.example.authservice.repository.AuthUserRepository;
+import com.example.authservice.repository.RoleRepository;
+import com.example.authservice.repository.UserRoleRepository;
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.Locale;
+import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +42,8 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthMapper authMapper;
     private final UserServiceClient userServiceClient;
+    private final RoleRepository roleRepository;
+    private final UserRoleRepository userRoleRepository;
 
     public AuthService(
             AuthUserRepository authUserRepository,
@@ -44,7 +52,9 @@ public class AuthService {
             TokenService tokenService,
             JwtService jwtService,
             AuthMapper authMapper,
-            UserServiceClient userServiceClient
+            UserServiceClient userServiceClient,
+            RoleRepository roleRepository,
+            UserRoleRepository userRoleRepository
     ) {
         this.authUserRepository = authUserRepository;
         this.authSessionRepository = authSessionRepository;
@@ -53,46 +63,77 @@ public class AuthService {
         this.jwtService = jwtService;
         this.authMapper = authMapper;
         this.userServiceClient = userServiceClient;
+        this.roleRepository = roleRepository;
+        this.userRoleRepository = userRoleRepository;
     }
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
-        String normalizedEmail = request.email().trim().toLowerCase(Locale.ROOT);
-        AuthUserEntity user = authUserRepository.findByEmailIgnoreCase(normalizedEmail)
-                .orElseGet(AuthUserEntity::new);
+        try {
+            String phoneNumber = normalizePhone(request.phoneNumber());
 
-        if (user.getId() != null && "ACTIVE".equalsIgnoreCase(user.getStatus())) {
-            throw new ResourceConflictException("A user with this email already exists.");
+            // Check if any user with this phone exists
+            boolean phoneExists = authUserRepository.existsByPhoneNumber(phoneNumber);
+            if (phoneExists) {
+                throw new ResourceConflictException("A user with this phone number already exists.");
+            }
+
+            AuthUserEntity user = new AuthUserEntity();
+            user.setPhoneNumber(phoneNumber);
+            user.setFullName(request.fullName().trim());
+            user.setEmail(null);  // Email optional
+            user.setPasswordHash(passwordEncoder.encode(request.password()));
+            user.setStatus("PENDING_VERIFICATION");
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
+
+            String otpCode = tokenService.generateOtpCode();
+            user.setOtpCodeHash(tokenService.hashOtpCode(otpCode));
+            user.setOtpExpiresAt(OffsetDateTime.now().plus(OTP_TTL));
+            user.setOtpSentAt(OffsetDateTime.now());
+            user.setOtpAttempts(0);
+
+            AuthUserEntity savedUser = authUserRepository.save(user);
+            if (savedUser == null) {
+                throw new IllegalStateException("Failed to save user");
+            }
+
+            // Assign default USER role
+            RoleEntity userRole = roleRepository.findByName("USER")
+                    .orElseThrow(() -> new IllegalStateException("Default USER role not found in database"));
+            UserRoleEntity userRoleEntity = new UserRoleEntity();
+            userRoleEntity.setUser(savedUser);
+            userRoleEntity.setRole(userRole);
+            userRoleEntity.setId(new UserRoleId(savedUser.getId(), userRole.getId()));
+            userRoleRepository.save(userRoleEntity);
+
+            savedUser.setRoles(List.of("USER"));
+
+            // Create user profile in user-service (best-effort)
+            try {
+                userServiceClient.createUser(savedUser.getFullName(), savedUser.getPhoneNumber(), savedUser.getEmail());
+            } catch (Exception e) {
+                // Log but don't fail registration
+            }
+
+            return new RegisterResponse(
+                    true,
+                    otpCode,
+                    savedUser.getOtpExpiresAt(),
+                    "Verification code generated. Confirm the OTP to continue.",
+                    authMapper.toUserResponse(savedUser)
+            );
+        } catch (DataIntegrityViolationException ex) {
+            // Race condition: phone uniqueness constraint violation
+            throw new ResourceConflictException("This phone number is already registered.");
         }
-
-        user.setFullName(request.fullName().trim());
-        user.setEmail(normalizedEmail);
-        user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setStatus("PENDING_VERIFICATION");
-        user.setFailedLoginAttempts(0);
-        user.setLockedUntil(null);
-
-        String otpCode = tokenService.generateOtpCode();
-        user.setOtpCodeHash(tokenService.hashOtpCode(otpCode));
-        user.setOtpExpiresAt(OffsetDateTime.now().plus(OTP_TTL));
-        user.setOtpSentAt(OffsetDateTime.now());
-        user.setOtpAttempts(0);
-
-        AuthUserEntity savedUser = authUserRepository.save(user);
-        return new RegisterResponse(
-                true,
-                otpCode,
-                savedUser.getOtpExpiresAt(),
-                "Verification code generated. Confirm the OTP to continue.",
-                authMapper.toUserResponse(savedUser)
-        );
     }
 
     @Transactional
     public AuthTokensResponse verifyOtp(VerifyOtpRequest request) {
-        String normalizedEmail = request.email().trim().toLowerCase(Locale.ROOT);
-        AuthUserEntity user = authUserRepository.findByEmailIgnoreCase(normalizedEmail)
-                .orElseThrow(() -> new AuthenticationFailedException("Invalid email or verification code."));
+        String phoneNumber = normalizePhone(request.phoneNumber());
+        AuthUserEntity user = authUserRepository.findByPhoneNumber(phoneNumber)
+                .orElseThrow(() -> new AuthenticationFailedException("Invalid phone number or verification code."));
 
         if ("ACTIVE".equalsIgnoreCase(user.getStatus())) {
             throw new AuthenticationFailedException("Account is already verified. Please login.");
@@ -118,15 +159,19 @@ public class AuthService {
         user.setLockedUntil(null);
 
         AuthUserEntity savedUser = authUserRepository.save(user);
-        userServiceClient.createUser(savedUser.getFullName(), savedUser.getEmail());
+        try {
+            userServiceClient.createUser(savedUser.getFullName(), savedUser.getPhoneNumber(), savedUser.getEmail());
+        } catch (Exception e) {
+            // best-effort, ignore
+        }
         return createSessionResponse(savedUser);
     }
 
     @Transactional
     public AuthTokensResponse login(LoginRequest request) {
-        String normalizedEmail = request.email().trim().toLowerCase(Locale.ROOT);
-        AuthUserEntity user = authUserRepository.findByEmailIgnoreCase(normalizedEmail)
-                .orElseThrow(() -> new AuthenticationFailedException("Invalid email or password."));
+        String phoneNumber = normalizePhone(request.phoneNumber());
+        AuthUserEntity user = authUserRepository.findByPhoneNumber(phoneNumber)
+                .orElseThrow(() -> new AuthenticationFailedException("Invalid phone number or password."));
 
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(OffsetDateTime.now())) {
             throw new AuthenticationFailedException("Account is temporarily locked. Try again later.");
@@ -144,7 +189,7 @@ public class AuthService {
                 user.setLockedUntil(OffsetDateTime.now().plus(Duration.ofMinutes(15)));
                 user.setFailedLoginAttempts(0);
             }
-            throw new AuthenticationFailedException("Invalid email or password.");
+            throw new AuthenticationFailedException("Invalid phone number or password.");
         }
 
         user.setFailedLoginAttempts(0);
@@ -189,15 +234,13 @@ public class AuthService {
     @Transactional(readOnly = true)
     public AuthUserResponse getMe(String authorizationHeader) {
         long userId = jwtService.decodeBearer(authorizationHeader).userId();
-        AuthUserEntity user = authUserRepository.findById(userId)
+        AuthUserEntity user = authUserRepository.findByIdWithRoles(userId)
                 .orElseThrow(() -> new TokenValidationException("User not found for token."));
         return authMapper.toUserResponse(user);
     }
 
     private void validateRefreshSession(AuthSessionEntity session) {
         if (session.getRevokedAt() != null) {
-            // Reuse detection: if a revoked refresh token is presented again, treat it as suspicious and revoke
-            // all active sessions for the user (defense in depth).
             authSessionRepository.revokeAllActiveForUser(session.getUser(), OffsetDateTime.now());
             throw new TokenValidationException("Refresh token has already been revoked.");
         }
@@ -228,5 +271,24 @@ public class AuthService {
                 "Bearer",
                 accessTokenIssue.user()
         );
+    }
+
+    private String normalizePhone(String phone) {
+        String cleaned = phone.trim();
+
+        // Auto-prepend +91 for 10-digit local Indian numbers (starting with 6-9)
+        if (!cleaned.startsWith("+")) {
+            String digitsOnly = cleaned.replaceAll("\\D", "");
+            if (digitsOnly.length() == 10 && digitsOnly.matches("^[6-9]\\d{9}$")) {
+                cleaned = "+91" + digitsOnly;
+            } else {
+                cleaned = "+" + digitsOnly;
+            }
+        }
+
+        // Remove spaces/dashes after +
+        cleaned = cleaned.replaceAll("[\\s-]", "");
+
+        return cleaned;
     }
 }

@@ -1,21 +1,21 @@
 package com.example.apigateway.web;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
+import reactor.core.publisher.Mono;
 
 @Component
-public class RateLimitFilter extends OncePerRequestFilter {
+public class RateLimitFilter implements WebFilter {
 
     private final Duration window;
     private final int limitPerWindow;
@@ -32,15 +32,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
-        String path = request.getRequestURI();
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        String path = exchange.getRequest().getURI().getPath();
         if (path == null || !path.startsWith(pathPrefix)) {
-            filterChain.doFilter(request, response);
-            return;
+            return chain.filter(exchange);
         }
 
-        String key = clientIp(request) + "|" + path;
+        String key = clientIp(exchange.getRequest()) + "|" + path;
         WindowCounter counter = counters.compute(key, (k, existing) -> {
             long now = System.currentTimeMillis();
             if (existing == null || existing.isExpired(now, window)) {
@@ -52,30 +50,29 @@ public class RateLimitFilter extends OncePerRequestFilter {
         int count = counter.incrementAndGet();
         if (count > limitPerWindow) {
             long retryAfterSeconds = Math.max(1, counter.retryAfterSeconds(window));
-            response.setStatus(429);
-            response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.getOutputStream().write(
-                    ("{\"message\":\"Too many requests. Try again later.\"}")
-                            .getBytes(StandardCharsets.UTF_8)
+            exchange.getResponse().setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
+            exchange.getResponse().getHeaders().add("Retry-After", String.valueOf(retryAfterSeconds));
+            exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            String body = "{\"message\":\"Too many requests. Try again later.\"}";
+            return exchange.getResponse().writeWith(
+                    Mono.just(exchange.getResponse().bufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8)))
             );
-            return;
         }
 
-        filterChain.doFilter(request, response);
+        return chain.filter(exchange);
     }
 
-    private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
+    private String clientIp(ServerHttpRequest request) {
+        String forwardedFor = request.getHeaders().getFirst("X-Forwarded-For");
         if (forwardedFor != null && !forwardedFor.isBlank()) {
             int comma = forwardedFor.indexOf(',');
             return (comma >= 0 ? forwardedFor.substring(0, comma) : forwardedFor).trim();
         }
-        String realIp = request.getHeader("X-Real-IP");
+        String realIp = request.getHeaders().getFirst("X-Real-IP");
         if (realIp != null && !realIp.isBlank()) {
             return realIp.trim();
         }
-        return request.getRemoteAddr();
+        return request.getRemoteAddress() != null ? request.getRemoteAddress().getAddress().getHostAddress() : "unknown";
     }
 
     private static final class WindowCounter {
@@ -102,3 +99,4 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
     }
 }
+

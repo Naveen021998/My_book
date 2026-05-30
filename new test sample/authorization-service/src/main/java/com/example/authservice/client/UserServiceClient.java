@@ -1,4 +1,4 @@
-﻿package com.example.authservice.client;
+package com.example.authservice.client;
 
 import com.example.authservice.config.UserServiceProperties;
 import java.net.URI;
@@ -29,8 +29,12 @@ public class UserServiceClient {
      * using the internal endpoint. This client exists only as a fallback and must not break registration
      * if user-service is down or protected.
      */
-    public void createUser(String fullName, String email) {
-        UserCreateUserRequest request = new UserCreateUserRequest(fullName, email, "+0000000000");
+    public void createUser(String fullName, String phoneNumber, String email) {
+        // If email is blank, generate placeholder from phone
+        if (email == null || email.isBlank()) {
+            email = phoneNumber + "@phone.invalid";
+        }
+        UserCreateUserRequest request = new UserCreateUserRequest(fullName, email, phoneNumber);
         try {
             restTemplate.postForLocation(usersUri, request);
         } catch (RestClientException ex) {

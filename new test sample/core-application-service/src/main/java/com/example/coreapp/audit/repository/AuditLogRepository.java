@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.audit.repository;
+package com.example.coreapp.audit.repository;
 
 import com.example.coreapp.audit.entity.AuditLogEntity;
 import org.springframework.data.domain.Page;

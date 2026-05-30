@@ -1,4 +1,4 @@
-﻿package com.example.authservice.common.web;
+package com.example.authservice.common.web;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

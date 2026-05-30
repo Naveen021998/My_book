@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.party.repository;
+package com.example.coreapp.party.repository;
 
 import com.example.coreapp.party.entity.PartyBalanceEntity;
 import jakarta.persistence.LockModeType;

@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.party.repository;
+package com.example.coreapp.party.repository;
 
 import com.example.coreapp.party.entity.PartyEntity;
 import java.util.Optional;

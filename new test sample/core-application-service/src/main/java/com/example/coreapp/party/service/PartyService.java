@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.party.service;
+package com.example.coreapp.party.service;
 
 import com.example.coreapp.audit.service.AuditLogService;
 import com.example.coreapp.common.exception.ResourceNotFoundException;

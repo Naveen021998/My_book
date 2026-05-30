@@ -1,4 +1,4 @@
-﻿package com.example.coreapp.audit.service;
+package com.example.coreapp.audit.service;
 
 import com.example.coreapp.audit.dto.AuditLogResponse;
 import com.example.coreapp.audit.entity.AuditLogEntity;

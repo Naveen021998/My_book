@@ -12,6 +12,8 @@ import com.example.authservice.dto.RegisterRequest;
 import com.example.authservice.dto.AuthUserResponse;
 import com.example.authservice.entity.AuthSessionEntity;
 import com.example.authservice.entity.AuthUserEntity;
+import com.example.authservice.entity.RoleEntity;
+import com.example.authservice.entity.UserRoleEntity;
 import com.example.authservice.exception.AuthenticationFailedException;
 import com.example.authservice.exception.ResourceConflictException;
 import com.example.authservice.exception.TokenValidationException;
@@ -19,6 +21,8 @@ import com.example.authservice.mapper.AuthMapper;
 import com.example.authservice.repository.AuthSessionRepository;
 import com.example.authservice.repository.AuthUserRepository;
 import com.example.authservice.client.UserServiceClient;
+import com.example.authservice.repository.RoleRepository;
+import com.example.authservice.repository.UserRoleRepository;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +53,12 @@ class AuthServiceTest {
     @Mock
     private UserServiceClient userServiceClient;
 
+    @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
+    private UserRoleRepository userRoleRepository;
+
     private AuthService authService;
 
     @BeforeEach
@@ -60,32 +70,34 @@ class AuthServiceTest {
                 tokenService,
                 jwtService,
                 new AuthMapper(),
-                userServiceClient
+                userServiceClient,
+                roleRepository,
+                userRoleRepository
         );
     }
 
     @Test
-    void registerRejectsDuplicateEmail() {
-        when(authUserRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(new AuthUserEntity()));
+    void registerRejectsDuplicatePhone() {
+        when(authUserRepository.existsByPhoneNumber("+919876543210")).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.register(new RegisterRequest("Test User", "test@example.com", "Password123")))
+        assertThatThrownBy(() -> authService.register(new RegisterRequest("Test User", "+919876543210", "Password123")))
                 .isInstanceOf(ResourceConflictException.class)
-                .hasMessage("A user with this email already exists.");
+                .hasMessage("A user with this phone number already exists.");
     }
 
     @Test
     void loginRejectsInvalidPassword() {
         AuthUserEntity user = new AuthUserEntity();
         user.setFullName("Test User");
-        user.setEmail("test@example.com");
+        user.setPhoneNumber("+919876543210");
         user.setPasswordHash("encoded");
         user.setStatus("ACTIVE");
-        when(authUserRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(user));
+        when(authUserRepository.findByPhoneNumber("+919876543210")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.login(new LoginRequest("test@example.com", "wrong")))
+        assertThatThrownBy(() -> authService.login(new LoginRequest("+919876543210", "wrong")))
                 .isInstanceOf(AuthenticationFailedException.class)
-                .hasMessage("Invalid email or password.");
+                .hasMessage("Invalid phone number or password.");
     }
 
     @Test
@@ -103,17 +115,18 @@ class AuthServiceTest {
 
     @Test
     void registerCreatesOtp() {
-        when(authUserRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.empty());
+        when(authUserRepository.existsByPhoneNumber("+919876543210")).thenReturn(false);
         when(passwordEncoder.encode("Password123")).thenReturn("encoded");
         when(authUserRepository.save(any(AuthUserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tokenService.generateOtpCode()).thenReturn("123456");
         when(tokenService.hashOtpCode("123456")).thenReturn("otp-hash");
+        when(roleRepository.findByName("USER")).thenReturn(Optional.of(new RoleEntity()));
 
-        var response = authService.register(new RegisterRequest("Test User", "test@example.com", "Password123"));
+        var response = authService.register(new RegisterRequest("Test User", "+919876543210", "Password123"));
 
         assertThat(response.verificationRequired()).isTrue();
         assertThat(response.otpCode()).isEqualTo("123456");
-        assertThat(response.user().email()).isEqualTo("test@example.com");
+        assertThat(response.user().phoneNumber()).isEqualTo("+919876543210");
         assertThat(response.user().status()).isEqualTo("PENDING_VERIFICATION");
     }
 }

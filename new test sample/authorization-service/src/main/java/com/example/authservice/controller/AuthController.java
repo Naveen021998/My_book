@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -56,24 +57,28 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<AuthTokensResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(authService.refresh(request));
     }
 
     @PostMapping("/logout")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout-all")
-    public ResponseEntity<Void> logoutAll(@RequestHeader(name = "Authorization", required = false) String authorization) {
-        authService.logoutAll(authorization);
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<Void> logoutAll(@RequestHeader("Authorization") String authorizationHeader) {
+        authService.logoutAll(authorizationHeader);
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/me")
-    public ResponseEntity<AuthUserResponse> me(@RequestHeader(name = "Authorization", required = false) String authorization) {
-        return ResponseEntity.ok(authService.getMe(authorization));
-    }
-}
+     @GetMapping("/me")
+     @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+     public ResponseEntity<AuthUserResponse> getMe(@RequestHeader("Authorization") String authorizationHeader) {
+         return ResponseEntity.ok(authService.getMe(authorizationHeader));
+     }
+ }
